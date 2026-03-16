@@ -1,0 +1,6 @@
+@TransportRouteApi_HostAddress = http://localhost:5285
+
+GET {{TransportRouteApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
