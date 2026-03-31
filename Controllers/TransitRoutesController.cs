@@ -25,35 +25,6 @@ namespace TransportRouteApi.Controllers
 
         // GET: api/TransitRoutes
         [HttpGet]
-        [AllowAnonymous] // Allow unauthenticated access to this endpoint
-        public async Task<ActionResult<IEnumerable<TransitRouteResponseDto>>> GetTransitRoutes()
-        {
-            var routes = await _context.TransitRoutes
-                .Include(route => route.Vehicles)
-                .ThenInclude(vehicle => vehicle.Category)
-                .Select(route => new TransitRouteResponseDto
-                {
-                    Id = route.Id,
-                    RouteName = route.RouteName,
-                    StartingPoint = route.StartingPoint,
-                    Destination = route.Destination,
-                    StartingHour = route.StartingHour,
-                    EndingHour = route.EndingHour,
-                    Vehicles = route.Vehicles.Select(vehicle => new VehicleResponseDto
-                    {
-                        Id = vehicle.Id,
-                        VehicleName = vehicle.VehicleName,
-                        CategoryName = vehicle.Category.CategoryName,
-                        RouteName = route.RouteName,
-                    }).ToList()
-                })
-                .ToListAsync();
-
-            return Ok(routes);
-        }
-
-        // GET: api/TransitRoutes
-        [HttpGet]
         [AllowAnonymous]
         public async Task<ActionResult<PaginatedResponseDto<TransitRouteResponseDto>>> GetTransitRoutes(
             [FromQuery] string? keyword, 
@@ -104,6 +75,26 @@ namespace TransportRouteApi.Controllers
             });
         }
 
+        // GET: api/TransitRoutes/all
+        [HttpGet("all")] 
+        public async Task<ActionResult<IEnumerable<object>>> GetAllTransitRoutesForDropdown()
+        {
+            // We use .Select() to strip out heavy data and ONLY send exactly what the dropdown needs.
+            // This dramatically reduces bandwidth and makes the API highly efficient!
+            var dropdownData = await _context.TransitRoutes
+                .Select(r => new 
+                { 
+                    id = r.Id, 
+                    routeName = r.RouteName,
+                    startingPoint = r.StartingPoint,
+                    destination = r.Destination
+                })
+                .ToListAsync();
+
+            return Ok(dropdownData);
+        }
+
+        // Probably will be looked again, this won't be used for a couple of times
         // GET: api/TransitRoutes/search?keyword=cicaheum&pageNumber=1&pageSize=50
         [HttpGet("search")]
         public async Task<ActionResult<PaginatedResponseDto<TransitRouteResponseDto>>> SearchTransitRoutes(
