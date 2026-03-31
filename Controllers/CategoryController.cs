@@ -86,6 +86,7 @@ namespace TransportRouteApi.Controllers
             return Ok(dropdownData);
         }
 
+        // GET: api/Category/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Category>> GetCategory(long id)
         {
