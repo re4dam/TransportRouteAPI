@@ -50,8 +50,8 @@ namespace TransportRouteApi.Controllers
                 {
                     Id = v.Id,
                     VehicleName = v.VehicleName,
-                    CategoryName = v.Category.CategoryName,
-                    RouteName = v.TransitRoute.RouteName
+                    CategoryName = v.Category != null ? v.Category.CategoryName : string.Empty,
+                    RouteName = v.TransitRoute != null ? v.TransitRoute.RouteName : string.Empty
                 })
                 .ToListAsync();
 
@@ -154,12 +154,17 @@ namespace TransportRouteApi.Controllers
                 .Include(v => v.TransitRoute)
                 .FirstOrDefaultAsync(v => v.Id == vehicle.Id);
 
+            if (createdVehicle == null)
+            {
+                return Problem("Vehicle was created but could not be loaded for the response.");
+            }
+
             var responseDto = new VehicleResponseDto
             {
                 Id = createdVehicle.Id,
                 VehicleName = createdVehicle.VehicleName,
-                CategoryName = createdVehicle.Category.CategoryName,
-                RouteName = createdVehicle.TransitRoute.RouteName
+                CategoryName = createdVehicle.Category != null ? createdVehicle.Category.CategoryName : string.Empty,
+                RouteName = createdVehicle.TransitRoute != null ? createdVehicle.TransitRoute.RouteName : string.Empty
             };
 
             return CreatedAtAction(nameof(GetVehicles), new { id = vehicle.Id }, responseDto);

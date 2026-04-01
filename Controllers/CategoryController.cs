@@ -54,7 +54,7 @@ namespace TransportRouteApi.Controllers
                         Id = vehicle.Id,
                         VehicleName = vehicle.VehicleName,
                         CategoryName = category.CategoryName,
-                        RouteName = vehicle.TransitRoute.RouteName
+                        RouteName = vehicle.TransitRoute != null ? vehicle.TransitRoute.RouteName : string.Empty
                     }).ToList()
                 })
                 .ToListAsync();
