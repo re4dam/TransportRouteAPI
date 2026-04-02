@@ -1,14 +1,16 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using Microsoft.AspNetCore.Antiforgery;
+
 using TransportRoute.Core.Data;
 using TransportRoute.Core.Models;
 using TransportRoute.Core.Converters;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.IdentityModel.Tokens;
 using TransportRoute.Security.Hashing;
 using TransportRoute.Security.Tokens;
 using TransportRoute.Security.Interfaces;
 using TransportRoute.Security.Services;
-using Microsoft.AspNetCore.Antiforgery;
+
 using System.Text;
 using Bogus; // Meant to generate data
 
@@ -167,6 +169,8 @@ END");
         Console.WriteLine("Seeding complete!");
     }
 }
+
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

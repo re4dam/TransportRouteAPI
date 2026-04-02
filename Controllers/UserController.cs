@@ -1,9 +1,11 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+
 using TransportRoute.Core.Data;
 using TransportRoute.Core.Models;
 using TransportRoute.Security.Interfaces;
+using TransportRoute.Security.Services;
 using TransportRouteApi.DTOs; // Importing your new DTO namespace
 
 namespace TransportRoute.Controllers
@@ -16,11 +18,13 @@ namespace TransportRoute.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IPasswordHasher _passwordHasher;
+        private readonly IAuditLogService _auditLogService;
 
-        public UsersController(AppDbContext context, IPasswordHasher passwordHasher)
+        public UsersController(AppDbContext context, IPasswordHasher passwordHasher, IAuditLogService auditLogService)
         {
             _context = context;
             _passwordHasher = passwordHasher;
+            _auditLogService = auditLogService;
         }
 
         // GET: api/Users
@@ -93,6 +97,37 @@ namespace TransportRoute.Controllers
             };
 
             return CreatedAtAction(nameof(GetUsers), new { id = newUser.Id }, responseDto);
+        }
+
+        [HttpPost("toggle-ban/{userId}")]
+        [Authorize(Roles = "Admin")] // Ensure only Admins can hit this
+        public async Task<IActionResult> ToggleUserBan(int userId)
+        {
+            var targetUser = await _context.Users.FindAsync(userId);
+            if (targetUser == null) return NotFound(new { message = "User not found." });
+
+            // 1. Toggle the ban status
+            targetUser.IsBanned = !targetUser.IsBanned;
+            await _context.SaveChangesAsync();
+
+            // 2. Identify who is doing the banning and from where
+            // This grabs the username from the secure HttpOnly cookie / JWT!
+            var adminUsername = User.Identity?.Name ?? "Unknown Admin"; 
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
+            var action = targetUser.IsBanned ? "Banned User" : "Unbanned User";
+
+            // 3. Write to the new Audit Log!
+            await _auditLogService.LogActionAsync(
+                username: adminUsername,
+                action: action,
+                target: $"User: {targetUser.Username}",
+                ipAddress: ipAddress
+            );
+
+            return Ok(new { 
+                message = $"User {targetUser.Username} has been {(targetUser.IsBanned ? "banned" : "unbanned")}.",
+                isBanned = targetUser.IsBanned 
+            });
         }
 
         // PUT: api/Users/5
