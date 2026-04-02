@@ -7,6 +7,8 @@ using Microsoft.IdentityModel.Tokens;
 using TransportRoute.Security.Hashing;
 using TransportRoute.Security.Tokens;
 using TransportRoute.Security.Interfaces;
+using TransportRoute.Security.Services;
+using Microsoft.AspNetCore.Antiforgery;
 using System.Text;
 using Bogus; // Meant to generate data
 
@@ -33,7 +35,11 @@ var allowedFrontendOrigins = builder.Configuration.GetSection("AllowedOrigins").
                                 "http://localhost:3000",
                                 "https://localhost:3000",
                                 "http://localhost:5500",
-                                "https://localhost:5500"
+                                "https://localhost:5500",
+                                "http://127.0.0.1:3000",
+                                "https://127.0.0.1:3000",
+                                "http://127.0.0.1:5500",
+                                "https://127.0.0.1:5500"
                             ];
 
 allowedFrontendOrigins = allowedFrontendOrigins
@@ -56,6 +62,7 @@ builder.Services.AddCors(options =>
 // Register reusable Security services
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IJwtProvider, JwtProvider>();
+builder.Services.AddScoped<IEmailService, EmailService>();
 
 // Configure JWT Authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

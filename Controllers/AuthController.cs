@@ -1,9 +1,11 @@
+using System.Security.Cryptography;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using TransportRoute.Core.Data;
 using TransportRoute.Core.Models;
 using TransportRoute.Security.Interfaces;
+using TransportRoute.Security.Services;
 using TransportRouteApi.DTOs; // <-- Add this to import the newly separated DTO
 
 namespace TransportRouteApi.Controllers;
@@ -16,13 +18,15 @@ public class AuthController : ControllerBase
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtProvider _jwtProvider;
     private readonly IAntiforgery _antiforgery;
+    private readonly IEmailService _emailService;
 
-    public AuthController(AppDbContext context, IPasswordHasher passwordHasher, IJwtProvider jwtProvider, IAntiforgery antiforgery)
+    public AuthController(AppDbContext context, IPasswordHasher passwordHasher, IJwtProvider jwtProvider, IAntiforgery antiforgery, IEmailService emailService)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _jwtProvider = jwtProvider;
         _antiforgery = antiforgery;
+        _emailService = emailService;
     }
 
     [HttpPost("register")]
@@ -31,23 +35,41 @@ public class AuthController : ControllerBase
         if (await _context.Users.AnyAsync(u => u.Username == request.Username))
             return BadRequest("Username already exists.");
 
-        var user = new User
+        var tokenBytes = RandomNumberGenerator.GetBytes(32);
+        string verificationToken = Convert.ToHexString(tokenBytes);
+
+        var newUser = new User
         {
             Username = request.Username,
+            Email = request.Email,
             PasswordHash = _passwordHasher.Hash(request.Password),
-            Role = request.Role // Set the user role from the DTO
+            Role = request.Role, // Set the user role from the DTO
+            EmailVerificationToken = verificationToken,
+            IsEmailVerified = false
         };
 
-        _context.Users.Add(user);
+        // Save the new user to the database
+        _context.Users.Add(newUser);
         await _context.SaveChangesAsync();
 
-        return Ok("User registered successfully.");
+        // Send the verification email
+        string verificationLink = $"http://localhost:3000/verify-email?token={verificationToken}";
+        string emailBody = $"<h3>Welcome to TransportRoute!</h3><p>Please verify your email by clicking <a href='{verificationLink}'>here</a>.</p>";
+        
+        await _emailService.SendEmailAsync(newUser.Email, "Verify your account", emailBody);
+
+        return Ok(new { message = "Registration successful. Please check your email to verify your account before logging in." });
     }
 
     [HttpPost("login")]
     public async Task<IActionResult> Login(LoginUserDto request)
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+
+        if (!user.IsEmailVerified)
+        {
+            return Unauthorized(new { message = "You must verify your email address before logging in." });
+        }
         
         if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
             return Unauthorized(new { message = "Invalid credentials." });
@@ -93,5 +115,72 @@ public class AuthController : ControllerBase
         });
         
         return Ok(new { message = "Successfully logged out." });
+    }
+
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail([FromBody] VerifyEmailDto request)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.EmailVerificationToken == request.Token);
+        
+        if (user == null) return BadRequest(new { message = "Invalid verification token." });
+
+        user.IsEmailVerified = true;
+        user.EmailVerificationToken = null; // Wipe it so it can't be used again
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Email verified successfully! You may now log in." });
+    }
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword([FromBody] ForgotPasswordDto request)
+    {
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
+        
+        // SECURITY RULE: Always return OK even if the user isn't found. 
+        // This prevents hackers from using this endpoint to guess valid usernames.
+        if (user == null)
+            return Ok(new { message = "If that account exists, a reset link has been generated." });
+
+        // 1. Generate a secure, 64-character random hex string
+        var randomBytes = new byte[32];
+        using (var rng = RandomNumberGenerator.Create())
+        {
+            rng.GetBytes(randomBytes);
+        }
+        string resetToken = Convert.ToHexString(randomBytes);
+
+        // 2. Assign token and set expiration (e.g., 15 minutes from now)
+        user.PasswordResetToken = resetToken;
+        user.ResetTokenExpires = DateTime.UtcNow.AddMinutes(15);
+        await _context.SaveChangesAsync();
+
+        string resetLink = $"http://localhost:3000/reset-password?token={resetToken}";
+        string emailBody = $"<p>Click <a href='{resetLink}'>here</a> to reset your password. This link expires in 15 minutes.</p>";
+
+        await _emailService.SendEmailAsync(user.Email, "Password Reset Request", emailBody);
+
+        return Ok(new { message = "If that account exists, a reset link has been generated." });
+    }
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordDto request)
+    {
+        // 1. Find the user holding this exact token
+        var user = await _context.Users.FirstOrDefaultAsync(u => u.PasswordResetToken == request.Token);
+
+        // 2. Validate token existence and expiration
+        if (user == null || user.ResetTokenExpires < DateTime.UtcNow)
+            return BadRequest(new { message = "Invalid or expired password reset token." });
+
+        // 3. Hash the new password using your existing hasher
+        user.PasswordHash = _passwordHasher.Hash(request.NewPassword);
+
+        // 4. Wipe the token so it can never be used again
+        user.PasswordResetToken = null;
+        user.ResetTokenExpires = null;
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new { message = "Password has been successfully reset." });
     }
 }
