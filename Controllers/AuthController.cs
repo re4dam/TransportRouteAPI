@@ -66,13 +66,13 @@ public class AuthController : ControllerBase
     {
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Username == request.Username);
 
+        if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
+            return Unauthorized(new { message = "Invalid credentials." });
+
         if (!user.IsEmailVerified)
         {
             return Unauthorized(new { message = "You must verify your email address before logging in." });
         }
-        
-        if (user == null || !_passwordHasher.Verify(request.Password, user.PasswordHash))
-            return Unauthorized(new { message = "Invalid credentials." });
 
         var roles = new string[] { user.Role };
 
