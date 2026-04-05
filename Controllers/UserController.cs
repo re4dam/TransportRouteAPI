@@ -53,7 +53,8 @@ namespace TransportRoute.Controllers
                 {
                     Id = u.Id,             
                     Username = u.Username, 
-                    Role = u.Role          
+                    Role = u.Role,
+                    IsBanned = u.IsBanned
                 })
                 .ToListAsync();
 
@@ -91,9 +92,9 @@ namespace TransportRoute.Controllers
             // Return the created resource using the response DTO
             var responseDto = new UserResponseDto
             {
-                Id = newUser.Id,             //[cite: 5]
-                Username = newUser.Username, //[cite: 5]
-                Role = newUser.Role          //[cite: 5]
+                Id = newUser.Id,
+                Username = newUser.Username,
+                Role = newUser.Role
             };
 
             return CreatedAtAction(nameof(GetUsers), new { id = newUser.Id }, responseDto);
