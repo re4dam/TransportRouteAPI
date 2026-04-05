@@ -102,6 +102,8 @@ builder.Services.AddAntiforgery(options =>
     options.HeaderName = "X-CSRF-TOKEN";
 });
 
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
+
 var app = builder.Build();
 
 // 🚨 PLUG IN YOUR CUSTOM SAFETY NET HERE
@@ -170,8 +172,6 @@ END");
     }
 }
 
-builder.Services.AddScoped<IAuditLogService, AuditLogService>();
-
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -195,6 +195,7 @@ app.UseAntiforgery(); // Enable CSRF protection middleware
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<TransportRouteApi.Middleware.BanCheckMiddleware>(); // Check if user is banned on every request after auth
 app.MapControllers();
 
 app.Run();
