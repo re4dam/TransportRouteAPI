@@ -248,7 +248,7 @@ namespace TransportRouteApi.Controllers
         // DELETE: api/TransitRoutes/5
         [HttpDelete("{id}")]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
-        [Authorize(Roles = "Admin")] // Only users with the "Admin" role can delete transit routes
+        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // Only users with the "Admin" role can delete transit routes
         public async Task<IActionResult> DeleteTransitRoute(long id)
         {
             var routeEntity = await _context.TransitRoutes.FindAsync(id);

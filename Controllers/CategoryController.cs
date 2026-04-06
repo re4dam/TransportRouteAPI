@@ -159,7 +159,7 @@ namespace TransportRouteApi.Controllers
         // DELETE: api/Category/5
         [HttpDelete("{id}")]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
-        [Authorize(Roles = "Admin")] // Only users with the "Admin" role can delete categories
+        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // Only users with the "Admin" role can delete categories
         public async Task<IActionResult> DeleteCategory(long id)
         {
             // Delete methods usually don't need DTOs since they just take an ID

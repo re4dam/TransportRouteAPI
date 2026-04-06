@@ -173,7 +173,7 @@ namespace TransportRouteApi.Controllers
         // DELETE: api/Vehicle/5
         [HttpDelete("{id}")]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
-        [Authorize(Roles = "Admin")] // Only users with the "Admin" role can delete vehicles
+        [Authorize(Roles = "SuperAdmin,RouteAdmin")] // Only users with the "Admin" role can delete vehicles
         public async Task<IActionResult> DeleteVehicle(long id)
         {
             var vehicle = await _context.Vehicles.FindAsync(id);

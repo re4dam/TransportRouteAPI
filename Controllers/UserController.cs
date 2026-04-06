@@ -13,7 +13,7 @@ namespace TransportRoute.Controllers
     [Route("api/[controller]")]
     [ApiController]
     // THE SHIELD: Locks down the entire controller to Admins only
-    [Authorize(Roles = "Admin")] 
+    [Authorize(Roles = "SuperAdmin")] 
     public class UsersController : ControllerBase
     {
         private readonly AppDbContext _context;
@@ -102,7 +102,7 @@ namespace TransportRoute.Controllers
 
         // POST: api/Users/toggle-ban/5
         [HttpPost("toggle-ban/{userId}")]
-        [Authorize(Roles = "Admin")] // Ensure only Admins can hit this
+        [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
         public async Task<IActionResult> ToggleUserBan(int userId)
         {
             var targetUser = await _context.Users.FindAsync(userId);
