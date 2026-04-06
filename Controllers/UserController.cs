@@ -100,6 +100,43 @@ namespace TransportRoute.Controllers
             return CreatedAtAction(nameof(GetUsers), new { id = newUser.Id }, responseDto);
         }
 
+        [HttpPost("create-user")]
+        // [Authorize(Roles = "SuperAdmin")]
+        public async Task<IActionResult> CreateProvisionedUser([FromBody] AdminCreateUserDto request)
+        {
+            // 1. Check if username or email already exists
+            if (await _context.Users.AnyAsync(u => u.Username == request.Username || u.Email == request.Email))
+            {
+                return BadRequest(new { message = "Username or Email already exists." });
+            }
+
+            // 2. Create the user
+            var newUser = new User
+            {
+                Username = request.Username,
+                Email = request.Email,
+                Role = request.Role,
+                IsBanned = false,
+                PasswordHash = _passwordHasher.Hash(request.Password)
+            };
+
+            _context.Users.Add(newUser);
+            await _context.SaveChangesAsync();
+
+            // 3. Log the action so we know WHICH SuperAdmin created this account
+            var adminUsername = User.Identity?.Name ?? "Unknown Admin";
+            var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown IP";
+            
+            await _auditLogService.LogActionAsync(
+                username: adminUsername,
+                action: "Provisioned New User",
+                target: $"User: {newUser.Username} ({newUser.Role})",
+                ipAddress: ipAddress
+            );
+
+            return Ok(new { message = $"Successfully created {newUser.Role} account for {newUser.Username}." });
+        }
+
         // POST: api/Users/toggle-ban/5
         [HttpPost("toggle-ban/{userId}")]
         [ValidateAntiForgeryToken] // <-- Add this to enforce the shield
