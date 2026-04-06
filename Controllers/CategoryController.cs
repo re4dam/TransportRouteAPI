@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -89,19 +90,23 @@ namespace TransportRouteApi.Controllers
         // GET: api/Category/archives
         [HttpGet("archives")]
         [Authorize(Roles = "SuperAdmin,RouteManager")]
-        public async Task<IActionResult> GetArchivedCategories()
+        public async Task<ActionResult<IEnumerable<ArchiveItemDto>>> GetArchivedCategories()
         {
-            var archivedCategories = await _context.Categories
-                .IgnoreQueryFilters()
+            var archives = await _context.Categories
+                .IgnoreQueryFilters() // Bypass the soft-delete shield
                 .Where(c => c.IsArchived == true)
-                .Select(c => new
+                .Select(c => new ArchiveItemDto
                 {
-                    c.Id,
-                    c.CategoryName
+                    Id = c.Id,
+                    PrimaryText = c.CategoryName,
+                    SecondaryText = "Category details unavailable",
+                    ArchivedAt = c.ArchivedAt,
+                    ArchivedBy = c.ArchivedBy ?? "System"
                 })
+                .OrderByDescending(c => c.ArchivedAt)
                 .ToListAsync();
 
-            return Ok(archivedCategories);
+            return Ok(archives);
         }
 
         // GET: api/Category/5
@@ -202,8 +207,10 @@ namespace TransportRouteApi.Controllers
             var category = await _context.Categories.FindAsync(id);
             if (category == null) return NotFound(new { message = "Category not found." });
 
-            // Soft-delete by flipping archive status.
+            // Record soft-delete metadata.
             category.IsArchived = true;
+            category.ArchivedAt = DateTime.UtcNow;
+            category.ArchivedBy = User.Identity?.Name ?? "Unknown Admin";
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Category successfully moved to archives." });
@@ -226,8 +233,10 @@ namespace TransportRouteApi.Controllers
             // Optional: Prevent them from restoring something that is already active
             if (!category.IsArchived) return BadRequest(new { message = "Category is already active." });
 
-            // Flip the switch back to restore it
+            // Flip the switch back to restore it and clear archive metadata
             category.IsArchived = false;
+            category.ArchivedAt = default;
+            category.ArchivedBy = string.Empty;
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Category successfully restored from archives." });

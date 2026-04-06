@@ -83,19 +83,23 @@ namespace TransportRouteApi.Controllers
         // GET: api/Vehicle/archives
         [HttpGet("archives")]
         [Authorize(Roles = "SuperAdmin,RouteManager")]
-        public async Task<IActionResult> GetArchivedVehicles()
+        public async Task<ActionResult<IEnumerable<ArchiveItemDto>>> GetArchivedVehicles()
         {
-            var archivedVehicles = await _context.Vehicles
-                .IgnoreQueryFilters()
+            var archives = await _context.Vehicles
+                .IgnoreQueryFilters() // Bypass the soft-delete shield
                 .Where(v => v.IsArchived == true)
-                .Select(v => new
+                .Select(v => new ArchiveItemDto
                 {
-                    v.Id,
-                    v.VehicleName
+                    Id = v.Id,
+                    PrimaryText = v.VehicleName,
+                    SecondaryText = "Vehicle details unavailable",
+                    ArchivedAt = v.ArchivedAt,
+                    ArchivedBy = v.ArchivedBy ?? "System"
                 })
+                .OrderByDescending(v => v.ArchivedAt)
                 .ToListAsync();
 
-            return Ok(archivedVehicles);
+            return Ok(archives);
         }
 
         // GET: api/Vehicle/5
@@ -215,8 +219,10 @@ namespace TransportRouteApi.Controllers
             var vehicle = await _context.Vehicles.FindAsync(id);
             if (vehicle == null) return NotFound(new { message = "Vehicle not found." });
 
-            // Soft-delete by flipping archive status.
+            // Record soft-delete metadata.
             vehicle.IsArchived = true;
+            vehicle.ArchivedAt = DateTime.UtcNow;
+            vehicle.ArchivedBy = User.Identity?.Name ?? "Unknown Admin";
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Vehicle successfully moved to archives." });
@@ -239,8 +245,10 @@ namespace TransportRouteApi.Controllers
             // Optional: Prevent them from restoring something that is already active
             if (!vehicle.IsArchived) return BadRequest(new { message = "Vehicle is already active." });
 
-            // Flip the switch back to restore it
+            // Flip the switch back to restore it and clear archive metadata
             vehicle.IsArchived = false;
+            vehicle.ArchivedAt = default;
+            vehicle.ArchivedBy = string.Empty;
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Vehicle successfully restored from archives." });

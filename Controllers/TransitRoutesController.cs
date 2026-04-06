@@ -195,21 +195,29 @@ namespace TransportRouteApi.Controllers
 
         // GET: api/TransitRoutes/archives
         [HttpGet("archives")]
-        [Authorize(Roles = "SuperAdmin,RouteManager")] // 🚨 VIPs only
-        public async Task<IActionResult> GetArchivedRoutes()
+        [Authorize(Roles = "SuperAdmin,RouteManager")]
+        public async Task<ActionResult<IEnumerable<ArchiveItemDto>>> GetArchivedRoutes()
         {
-            // 🚨 IgnoreQueryFilters() bypasses the magic shield!
-            var archivedRoutes = await _context.TransitRoutes
-                .IgnoreQueryFilters() 
+            var archives = await _context.TransitRoutes
+                .IgnoreQueryFilters() // Bypass the soft-delete shield
                 .Where(r => r.IsArchived == true)
-                .Select(r => new {
-                    r.Id,
-                    r.RouteName,
-                    // Include whatever details the admin needs to see
+                .Select(r => new ArchiveItemDto
+                {
+                    Id = r.Id,
+                    PrimaryText = r.RouteName, 
+                    
+                    // Customize this secondary text based on your actual Route model!
+                    // E.g., if you have StartLocation and EndLocation:
+                    SecondaryText = "Route details unavailable", // Replace with actual logic, e.g., $"{r.StartLocation} -> {r.EndLocation}"
+                    
+                    // Fallbacks just in case there is old data from before we added these columns
+                    ArchivedAt = r.ArchivedAt,
+                    ArchivedBy = r.ArchivedBy ?? "System" 
                 })
+                .OrderByDescending(r => r.ArchivedAt) // Send newest first
                 .ToListAsync();
 
-            return Ok(archivedRoutes);
+            return Ok(archives);
         }
 
         // POST: api/TransitRoutes
@@ -284,15 +292,17 @@ namespace TransportRouteApi.Controllers
 
         // PATCH: api/TransitRoutes/5/archive
         [HttpPatch("{id}/archive")]
-        [ValidateAntiForgeryToken]
         [Authorize(Roles = "SuperAdmin,RouteManager")]
         public async Task<IActionResult> ArchiveRoute(long id)
         {
             var route = await _context.TransitRoutes.FindAsync(id);
             if (route == null) return NotFound(new { message = "Route not found." });
 
-            // Soft-delete by flipping archive status.
+            // 🚨 1. Record the Soft Delete metadata
             route.IsArchived = true;
+            route.ArchivedAt = DateTime.UtcNow; // Always use UTC for database times!
+            route.ArchivedBy = User.Identity?.Name ?? "Unknown Admin";
+
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Route successfully moved to archives." });
@@ -304,19 +314,19 @@ namespace TransportRouteApi.Controllers
         [Authorize(Roles = "SuperAdmin,RouteManager")]
         public async Task<IActionResult> RestoreRoute(long id)
         {
-            // 🚨 CRITICAL: We cannot use FindAsync here. We must bypass the 
-            // Global Query Filter so EF Core can actually "see" the archived item.
             var route = await _context.TransitRoutes
                 .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(r => r.Id == id);
 
             if (route == null) return NotFound(new { message = "Route not found in archives." });
 
-            // Optional: Prevent them from restoring something that is already active
             if (!route.IsArchived) return BadRequest(new { message = "Route is already active." });
 
-            // Flip the switch back to restore it
+            // 🚨 Clear the flags
             route.IsArchived = false;
+            route.ArchivedAt = default;
+            route.ArchivedBy = string.Empty;
+
             await _context.SaveChangesAsync();
 
             return Ok(new { message = "Route successfully restored from archives." });
