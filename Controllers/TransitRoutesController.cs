@@ -278,7 +278,8 @@ namespace TransportRouteApi.Controllers
         [Authorize(Roles = "SuperAdmin")] // Only SuperAdmin can permanently delete transit routes
         public async Task<IActionResult> DeleteTransitRoute(long id)
         {
-            var routeEntity = await _context.TransitRoutes.FindAsync(id);
+            var routeEntity = await _context.TransitRoutes.IgnoreQueryFilters().FirstOrDefaultAsync(r => r.Id == id);
+            
             if (routeEntity == null)
             {
                 return NotFound();

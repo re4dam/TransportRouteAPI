@@ -194,8 +194,10 @@ namespace TransportRouteApi.Controllers
         [Authorize(Roles = "SuperAdmin")] // Only SuperAdmin can permanently delete categories
         public async Task<IActionResult> DeleteCategory(long id)
         {
-            // Delete methods usually don't need DTOs since they just take an ID
-            var category = await _context.Categories.FindAsync(id);
+            // Ignore query filters so archived categories can also be permanently deleted.
+            var category = await _context.Categories
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(c => c.Id == id);
             if (category == null)
             {
                 return NotFound();

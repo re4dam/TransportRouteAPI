@@ -198,7 +198,10 @@ namespace TransportRouteApi.Controllers
         [Authorize(Roles = "SuperAdmin")] // Only SuperAdmin can permanently delete vehicles
         public async Task<IActionResult> DeleteVehicle(long id)
         {
-            var vehicle = await _context.Vehicles.FindAsync(id);
+            // Ignore query filters so archived vehicles can also be permanently deleted.
+            var vehicle = await _context.Vehicles
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(v => v.Id == id);
             if (vehicle == null)
             {
                 return NotFound();
