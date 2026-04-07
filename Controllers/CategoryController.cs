@@ -50,6 +50,8 @@ namespace TransportRouteApi.Controllers
                 {
                     Id = category.Id,
                     CategoryName = category.CategoryName,
+                    Description = category.Description,
+                    DisplayColor = category.DisplayColor,
                     Vehicles = category.Vehicles.Select(vehicle => new VehicleResponseDto
                     {
                         Id = vehicle.Id,
@@ -131,7 +133,9 @@ namespace TransportRouteApi.Controllers
             // 1. Map the incoming DTO to a raw Entity so EF Core can save it
             var category = new Category
             {
-                CategoryName = categoryDto.CategoryName
+                CategoryName = categoryDto.CategoryName,
+                Description = categoryDto.Description,
+                DisplayColor = categoryDto.DisplayColor
             };
 
             _context.Categories.Add(category);
@@ -141,6 +145,8 @@ namespace TransportRouteApi.Controllers
             return CreatedAtAction(nameof(GetCategories), new { id = category.Id }, new CreateCategoryDto 
             {
                 CategoryName = category.CategoryName,
+                Description = categoryDto.Description,
+                DisplayColor = categoryDto.DisplayColor
                 // Vehicles = new List<VehicleResponseDto>() // Brand new category has no vehicles yet
             });
         }
@@ -159,6 +165,9 @@ namespace TransportRouteApi.Controllers
 
             // 2. Update only the allowed fields from the DTO
             category.CategoryName = categoryDto.CategoryName;
+            category.Description = categoryDto.Description;
+            category.DisplayColor = categoryDto.DisplayColor;
+
 
             try
             {
